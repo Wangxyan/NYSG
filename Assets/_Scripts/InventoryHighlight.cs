@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI; // Required for Image
 
 /// <summary>
 /// 库存物品的高亮逻辑处理相关
@@ -10,7 +11,32 @@ public class InventoryHighlight : MonoBehaviour
     /// <summary>
     /// 高亮的矩形变换
     /// </summary>
-    [SerializeField] private RectTransform highlighter;
+    [SerializeField] public RectTransform highlighter;
+
+    private Image highlightImageComponent;
+
+    [Header("Highlight Colors & Alpha")]
+    public Color canPlaceNoDisplacementColor = Color.green;
+    public Color cannotPlaceOrDisplacesColor = Color.red;
+    [Range(0f, 1f)]
+    public float highlightAlpha = 0.5f; // Default to 50% transparency
+
+    private void Awake()
+    {
+        if (highlighter != null)
+        {
+            highlightImageComponent = highlighter.GetComponent<Image>();
+            if (highlightImageComponent == null)
+            {
+                Debug.LogError("[InventoryHighlight] Highlighter RectTransform does not have an Image component!");
+            }
+        }
+        else
+        {
+            Debug.LogError("[InventoryHighlight] Highlighter RectTransform is not assigned!");
+        }
+        // Apply initial alpha to default colors, or ensure UpdateHighlightColor is called once.
+    }
 
     /// <summary>
     /// 根据条件显示或隐藏高亮
@@ -18,7 +44,24 @@ public class InventoryHighlight : MonoBehaviour
     /// <param name="b">条件</param>
     public void Show(bool b)
     {
-        highlighter.gameObject.SetActive(b);
+        if (highlighter != null)
+        {
+            highlighter.gameObject.SetActive(b);
+        }
+    }
+
+    /// <summary>
+    /// 更新高亮颜色, 并应用透明度
+    /// </summary>
+    /// <param name="isPositiveHighlight">True则为正面颜色 (如绿色), False则为负面颜色 (如红色)</param>
+    public void UpdateHighlightColor(bool isPositiveHighlight)
+    {
+        if (highlightImageComponent != null)
+        {
+            Color baseColor = isPositiveHighlight ? canPlaceNoDisplacementColor : cannotPlaceOrDisplacesColor;
+            baseColor.a = highlightAlpha; // Apply the alpha
+            highlightImageComponent.color = baseColor;
+        }
     }
 
     /// <summary>

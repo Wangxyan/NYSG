@@ -1,0 +1,400 @@
+{
+  "items": [
+    {
+      "Id": 1001,
+      "Name": "新春单联",
+      "Description": "不完整新春对联，\n另外一半不知所踪，\n带上它会使你的知识小幅提升",
+      "charm": 0,
+      "knowledge": 1,
+      "talent": 0,
+      "wealth": 0,
+      "Res": "ItemSprites/101",
+      "weaponGroupNum": 1,
+      "itemType": 1,
+      "Type": "2_1",
+      "Level": 1,
+      "Rarity": 0,
+      "SkillId": 101,
+      "Points": [[1],[1]],
+      "options_num": 10
+    },
+    {
+        "Id": 1002,
+        "Name": "新春对联",
+        "Description": "一副完整的新春对联，\n（上下联怎么一模一样？）\n带上它会使你的知识水平明显提升",
+        "charm":0,
+        "knowledge":3,
+        "talent":0,
+        "wealth":0,
+        "Res": "ItemSprites/102",
+        "weaponGroupNum": 1,
+        "itemType": 1,
+        "Type": "2_1",
+        "Level": 2,
+        "Rarity": 0,
+        "SkillId": 102,
+        
+        "Points": [
+          [
+            1
+          ],
+          [
+            1
+          ]
+        ],
+        "options_num": 10
+      },
+    {
+        "Id": 2001,
+        "Name": "家养土鸡",
+        "Description": "一只土鸡，\n看起来才艺很多的样子\n带上它可以使你的才艺小幅提升",
+        "charm":0,
+        "knowledge":0,
+        "talent":2,
+        "wealth":0,
+        "Res": "ItemSprites/201",
+        "weaponGroupNum": 2,
+        "itemType": 1,
+        "Type": "2_2",
+        "Level": 1,
+        "Rarity": 0,
+        "SkillId": 201,
+        "Points": [
+          [
+            1,
+            1
+          ],
+          [
+            0,
+            1
+          ]
+        ],
+        "options_num": 10
+      },
+      {
+        "Id": 2002,
+        "Name": "家养土鹅",
+        "Description": "一只土鹅，\n（有这个叫法吗？）\n带上它可以使你的才艺和魅力大幅提升",
+        "charm":4,
+        "knowledge":0,
+        "talent":4,
+        "wealth":0,
+        "Res": "ItemSprites/202",
+        "weaponGroupNum": 2,
+        "itemType": 1,
+        "Type": "2_2",
+        "Level": 2,
+        "Rarity": 0,
+        "SkillId": 202,
+        "Points": [
+          [
+            1,
+            1
+          ],
+          [
+            0,
+            1
+          ]
+        ],
+        "options_num": 10
+      },
+      {
+        "Id": 3001,
+        "Name": "红包mini",
+        "Description": "如假包换的红包，\n带上它会使你的财富小幅提升，\n\n“礼轻情意重”",
+        "charm":1,
+        "knowledge":0,
+        "talent":0,
+        "wealth":1,
+        "Res": "ItemSprites/301",
+        "weaponGroupNum": 3,
+        "itemType": 1,
+        "Type": "1_1",
+        "Level": 1,
+        "Rarity": 0,
+        "SkillId": 301,
+        "Points": [
+          [
+            1
+          ]
+        ],
+        "options_num": 10
+      },
+      {
+        "Id": 3002,
+        "Name": "红包pro",
+        "Description": "普普通通的红包，\n带上它会使你的财富明显提升",
+        "charm":0,
+        "knowledge":0,
+        "talent":0,
+        "wealth":3,
+        "Res": "ItemSprites/302",
+        "weaponGroupNum": 3,
+        "itemType": 1,
+        "Type": "1_1",
+        "Level": 2,
+        "Rarity": 0,
+        "SkillId": 302,
+        "Points": [
+          [
+            1
+          ]
+        ],
+        "options_num": 10
+      },
+      {
+        "Id": 3003,
+        "Name": "红包pro max",
+        "Description": "比较少见的红包，\n（太罕见了吧）\n带上它会使你的财富和魅力大幅提升",
+        "charm":9,
+        "knowledge":0,
+        "talent":0,
+        "wealth":9,
+        "Res": "ItemSprites/303",
+        "weaponGroupNum": 3,
+        "itemType": 1,
+        "Type": "1_1",
+        "Level": 3,
+        "Rarity": 0,
+        "SkillId": 303,
+        "Points": [
+          [
+            1
+          ]
+        ],
+        "options_num": 10
+      },
+      {
+        "Id": 4001,
+        "Name": "“尚方宝刀”",
+        "Description": "传说中的“尚方宝刀”，\n（不知道是哪个朝代的）\n带上它会使你的才艺小幅提升",
+        "charm":0,
+        "knowledge":0,
+        "talent":1,
+        "wealth":0,
+        "Res": "ItemSprites/401",
+        "weaponGroupNum": 4,
+        "itemType": 1,
+        "Type": "1_2",
+        "Level": 1,
+        "Rarity": 0,
+        "SkillId": 401,
+        "Points": [
+          [
+            1,
+            1
+          ]
+        ],
+        "options_num": 10
+      },
+      {
+        "Id": 4002,
+        "Name": "“尚方双刀”",
+        "Description": "传说中的“尚方双刀”，\n拿着它感觉有种神奇的力量？\n带上它会使你的才艺明显提升",
+        "charm":0,
+        "knowledge":0,
+        "talent":3,
+        "wealth":0,
+        "Res": "ItemSprites/402",
+        "weaponGroupNum": 4,
+        "itemType": 1,
+        "Type": "1_2",
+        "Level": 2,
+        "Rarity": 0,
+        "SkillId": 402,
+        "Points": [
+          [
+            1,
+            1
+          ]
+        ],
+        "options_num": 10
+      },
+      {
+        "Id": 4003,
+        "Name": "尚方双刀+6",
+        "Description": "传奇中的“尚方双刀”，\n据说有一刀999的力量\n带上它会使你的才艺大幅提升",
+        "charm":0,
+        "knowledge":0,
+        "talent":9,
+        "wealth":0,
+        "Res": "ItemSprites/403",
+        "weaponGroupNum": 4,
+        "itemType": 1,
+        "Type": "1_2",
+        "Level": 3,
+        "Rarity": 0,
+        "SkillId": 403,
+        "Points": [
+          [
+            1,
+            1
+          ]
+        ],
+        "options_num": 10
+      },
+      {
+        "Id": 5001,
+        "Name": "普通巧克力",
+        "Description": "普通的巧克力，\n只有简单的包装\n带上它会使你的魅力小幅提升",
+        "charm":1,
+        "knowledge":0,
+        "talent":0,
+        "wealth":0,
+        "Res": "ItemSprites/501",
+        "weaponGroupNum": 5,
+        "itemType": 1,
+        "Type": "1_1",
+        "Level": 1,
+        "Rarity": 0,
+        "SkillId": 501,
+        "Points": [
+          [
+            1
+          ]
+        ],
+        "options_num": 10
+      },
+      {
+        "Id": 5002,
+        "Name": "高级巧克力",
+        "Description": "包装精美的巧克力，\n（好像被谁咬了一口？）\n带上它会使你的魅力明显提升",
+        "charm":3,
+        "knowledge":0,
+        "talent":0,
+        "wealth":0,
+        "Res": "ItemSprites/502",
+        "weaponGroupNum": 5,
+        "itemType": 1,
+        "Type": "1_1",
+        "Level": 2,
+        "Rarity": 0,
+        "SkillId": 502,
+        "Points": [
+          [
+            1
+          ]
+        ],
+        "options_num": 10
+      },
+      {
+        "Id": 6001,
+        "Name": "牛奶",
+        "Description": "一盒牛奶，\n就是牛的奶，\n带上它会使你的魅力少许提升",
+        "charm":1,
+        "knowledge":0,
+        "talent":0,
+        "wealth":0,
+        "Res": "ItemSprites/601",
+        "weaponGroupNum": 6,
+        "itemType": 1,
+        "Type": "1_1",
+        "Level": 1,
+        "Rarity": 0,
+        "SkillId": 601,
+        "Points": [
+          [
+            1
+          ]
+        ],
+        "options_num": 10
+      },
+      {
+        "Id": 6002,
+        "Name": "特仑苏",
+        "Description": "一盒很贵的牛奶，\n也是牛的奶，\n带上它会使你的魅力明显提升",
+        "charm":3,
+        "knowledge":0,
+        "talent":0,
+        "wealth":0,
+        "Res": "ItemSprites/602",
+        "weaponGroupNum": 6,
+        "itemType": 1,
+        "Type": "1_1",
+        "Level": 2,
+        "Rarity": 0,
+        "SkillId": 602,
+        "Points": [
+          [
+            1
+          ]
+        ],
+        "options_num": 10
+      },
+      {
+        "Id": 7001,
+        "Name": "劲酒",
+        "Description": "一瓶劲酒，\n“劲酒虽劲，但是很劲”，\n带上它会使你的财富小幅提升",
+        "charm":3,
+        "knowledge":0,
+        "talent":0,
+        "wealth":0,
+        "Res": "ItemSprites/701",
+        "weaponGroupNum": 7,
+        "itemType": 1,
+        "Type": "2_1",
+        "Level": 1,
+        "Rarity": 2,
+        "SkillId": 701,
+        "Points": [
+          [
+            1
+          ],
+          [
+            1
+          ]
+        ],
+        "options_num": 10
+      },
+      {
+        "Id": 7002,
+        "Name": "汾酒",
+        "Description": "一瓶汾酒，\n“合久必分，汾酒必喝”\n带上它会使你的财富明显提升",
+        "charm":0,
+        "knowledge":0,
+        "talent":0,
+        "wealth":3,
+        "Res": "ItemSprites/702",
+        "weaponGroupNum": 7,
+        "itemType": 1,
+        "Type": "2_1",
+        "Level": 2,
+        "Rarity": 0,
+        "SkillId": 702,
+        "Points": [
+          [
+            1
+          ],
+          [
+            1
+          ]
+        ],
+        "options_num": 10
+      },
+      {
+        "Id": 7003,
+        "Name": "茅台",
+        "Description": "一瓶看起来很贵的茅台，\n“酱香科技，震撼人心”\n带上它会使你的财富大幅提升",
+        "charm":5,
+        "knowledge":0,
+        "talent":0,
+        "wealth":5,
+        "Res": "ItemSprites/703",
+        "weaponGroupNum": 7,
+        "itemType": 1,
+        "Type": "2_1",
+        "Level": 3,
+        "Rarity": 0,
+        "SkillId": 703,
+        "Points": [
+          [
+            1
+          ],
+          [
+            1
+          ]
+        ],
+        "options_num": 10
+      }
+  ]
+}
