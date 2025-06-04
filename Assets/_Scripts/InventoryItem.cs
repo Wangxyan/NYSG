@@ -22,6 +22,13 @@ public class InventoryItem : MonoBehaviour
     [Header("UI References")]
     [SerializeField] private Image itemImage; // 主物品图标
     [SerializeField] private Image blackOverlayImage; // 用于隐藏状态的黑色覆盖层
+    [Tooltip("The GameObject for the search/hidden overlay mask.")]
+    [SerializeField] private GameObject searchOverlay; // 在Inspector中指定这个遮罩对象
+
+    [Tooltip("The GameObject for the magnifying glass icon, child of SearchOverlay.")]
+    [SerializeField] private GameObject magnifyingGlassIconGO; // 在Inspector中指定放大镜图标对象
+
+    private Animator magnifyingGlassAnimator;
 
     /// <summary>
     /// 物品高度 (考虑旋转)
@@ -74,6 +81,28 @@ public class InventoryItem : MonoBehaviour
         // 初始时，根据默认状态更新视觉
         if (blackOverlayImage != null) blackOverlayImage.gameObject.SetActive(false);
         if (itemImage != null) itemImage.gameObject.SetActive(true);
+
+        if (searchOverlay == null)
+        {
+            Debug.LogWarning("SearchOverlay not assigned in Inspector for item: " + (jsonData != null ? jsonData.Name : "Unassigned Item"), this.gameObject);
+        }
+
+        if (magnifyingGlassIconGO != null)
+        {
+            magnifyingGlassAnimator = magnifyingGlassIconGO.GetComponent<Animator>();
+            if (magnifyingGlassAnimator == null)
+            {
+                Debug.LogError("MagnifyingGlassIconGO on " + (jsonData != null ? jsonData.Name : "Unassigned Item") + " does not have an Animator component!", this.gameObject);
+            }
+        }
+        else
+        {
+            Debug.LogWarning("MagnifyingGlassIconGO not assigned in Inspector for item: " + (jsonData != null ? jsonData.Name : "Unassigned Item"), this.gameObject);
+        }
+
+        // 根据初始 currentDisplayState 设置视觉状态
+        // 确保在 Awake 的末尾或 Start 中调用一次 SetDisplayState 以应用初始状态
+        SetDisplayState(currentDisplayState, true); // forceUpdate = true
     }
 
     /// <summary>
@@ -128,32 +157,57 @@ public class InventoryItem : MonoBehaviour
     /// <param name="forceUpdate">是否强制更新视觉，即使状态未改变</param>
     public void SetDisplayState(ItemDisplayState newState, bool forceUpdate = false)
     {
-        if (currentDisplayState == newState && !forceUpdate) return;
-
+        if (currentDisplayState == newState && !forceUpdate)
+        {
+            return;
+        }
+        // Debug.Log($"[InventoryItem] {jsonData?.Name} Setting DisplayState from {currentDisplayState} to {newState}. Force: {forceUpdate}");
         currentDisplayState = newState;
-        // Debug.Log($"Item {jsonData?.Name} changing state to {newState}");
 
-        if (blackOverlayImage == null || itemImage == null) 
+        bool showOverlay = newState == ItemDisplayState.Hidden || newState == ItemDisplayState.Searching;
+        bool showMagnifyingGlass = newState == ItemDisplayState.Searching;
+
+        if (searchOverlay != null)
         {
-            // Debug.LogError("InventoryItem: UI references (blackOverlayImage or itemImage) are null in SetDisplayState.", this);
-            return; // 避免在编辑器预览或未完全初始化时出错
+            if (searchOverlay.activeSelf != showOverlay)
+            {
+                searchOverlay.SetActive(showOverlay);
+            }
         }
 
-        switch (currentDisplayState)
+        if (magnifyingGlassIconGO != null)
         {
-            case ItemDisplayState.Hidden:
-                blackOverlayImage.gameObject.SetActive(true);
-                itemImage.gameObject.SetActive(false); // 隐藏实际图标以确保黑色完全覆盖且无交互
-                break;
-            case ItemDisplayState.Searching:
-                blackOverlayImage.gameObject.SetActive(true); // 视觉上与Hidden相同，动画由外部控制
-                itemImage.gameObject.SetActive(false);
-                break;
-            case ItemDisplayState.Revealed:
-                blackOverlayImage.gameObject.SetActive(false);
-                itemImage.gameObject.SetActive(true);
-                break;
+            if (magnifyingGlassIconGO.activeSelf != showMagnifyingGlass)
+            {
+                magnifyingGlassIconGO.SetActive(showMagnifyingGlass);
+            }
+
+            if (magnifyingGlassAnimator != null)
+            {
+                // 只有在需要显示放大镜时才启用Animator组件本身，否则禁用以节省性能
+                if (magnifyingGlassAnimator.enabled != showMagnifyingGlass)
+                {
+                    magnifyingGlassAnimator.enabled = showMagnifyingGlass;
+                }
+
+                // 如果Animator被启用 (即showMagnifyingGlass为true), 它会自动播放默认的循环动画。
+                // 如果需要确保从头播放，可以取消注释下一行：
+                // if (showMagnifyingGlass) magnifyingGlassAnimator.Play("MagnifyingGlassCircularPath", -1, 0f);
+            }
         }
+
+        if (itemImage != null) // itemImage 是物品本身的图标
+        {
+            // 当物品被遮罩时 (Hidden 或 Searching)，可以改变其颜色使其变暗
+            // 保留原始alpha值
+            float originalAlpha = itemImage.color.a;
+            Color targetColor = showOverlay ? new Color(0.6f, 0.6f, 0.6f, originalAlpha) : new Color(1f,1f,1f, originalAlpha);
+            if(itemImage.color != targetColor)
+            {
+                itemImage.color = targetColor;
+            }
+        }
+        // Debug.Log($"[InventoryItem] {jsonData?.Name} new state {newState}. Overlay: {searchOverlay?.activeSelf}, Glass: {magnifyingGlassIconGO?.activeSelf}, Animator: {magnifyingGlassAnimator?.enabled}");
     }
 
     /// <summary>

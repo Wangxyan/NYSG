@@ -164,7 +164,7 @@ public class ItemGrid : MonoBehaviour
             }
         }
     }
-    
+
     /// <summary>
     /// 将物品放置到指定位置上。如果该位置已有物品，则这些物品会被清除引用并作为 displacedItemsOutput 返回。
     /// </summary>
@@ -341,7 +341,7 @@ public class ItemGrid : MonoBehaviour
         // if multiple distinct items, it's an invalid placement (can't bridge multiple items).
         // This interpretation might be from the old PlaceItem logic.
         if (itemsInArea.Count == 1)
-        {
+                    {
             overlapItem = itemsInArea[0];
             return true; // Overlaps with a single item
         }
@@ -415,7 +415,7 @@ public class ItemGrid : MonoBehaviour
                     if (inventoryItemSlot[currentSlotX, currentSlotY] == item)
                     {
                         inventoryItemSlot[currentSlotX, currentSlotY] = null;
-                    }
+            }
                     else if (inventoryItemSlot[currentSlotX, currentSlotY] != null)
                     {
                         Debug.LogWarning($"[ItemGrid.ClearGridReference] Slot ({currentSlotX},{currentSlotY}) was expected to hold {item.jsonData.Name} (or be part of it) but holds {inventoryItemSlot[currentSlotX, currentSlotY].jsonData.Name} or was already null when clearing {item.jsonData.Name}. This might be an overlapping clear or stale data.");
@@ -468,20 +468,24 @@ public class ItemGrid : MonoBehaviour
         return inventoryItemSlot[x, y];
     }
 
-    public Vector2Int? FindSpaceForObject(InventoryItem itemToInsert)
+    /// <summary>
+    /// Finds the first available top-left position in the grid for an object of the given dimensions.
+    /// </summary>
+    /// <param name="itemWidth">The width of the item to find space for.</param>
+    /// <param name="itemHeight">The height of the item to find space for.</param>
+    /// <returns>A Vector2Int position if space is found, otherwise null.</returns>
+    public Vector2Int? FindSpaceForObject(int itemWidth, int itemHeight)
     {
-        if (inventoryItemSlot == null || itemToInsert == null) return null;
-
-        int width = itemToInsert.WIDTH;
-        int height = itemToInsert.HEIGHT;
+        if (inventoryItemSlot == null) return null;
+        if (itemWidth <= 0 || itemHeight <= 0) return null; // Invalid dimensions
 
         // Iterate through all possible top-left positions for the item
-        for (int y = 0; y <= gridSizeHeight - height; y++) // Iterate rows
+        for (int y = 0; y <= gridSizeHeight - itemHeight; y++) // Iterate rows
         {
-            for (int x = 0; x <= gridSizeWidth - width; x++) // Iterate columns
+            for (int x = 0; x <= gridSizeWidth - itemWidth; x++) // Iterate columns
             {
                 // Check if this top-left position (x,y) can accommodate the item
-                if (IsAreaClear(x, y, width, height))
+                if (IsAreaClear(x, y, itemWidth, itemHeight))
                 {
                     return new Vector2Int(x, y); // Found a clear space
                 }
@@ -497,10 +501,10 @@ public class ItemGrid : MonoBehaviour
     {
         for (int x = 0; x < width; x++)
         {
-            for (int y = 0; y < height; y++)
-            {
+        for (int y = 0; y < height; y++)
+        {
                 if (startX + x >= gridSizeWidth || startY + y >= gridSizeHeight || inventoryItemSlot[startX + x, startY + y] != null)
-                {
+            {
                     return false;
                 }
             }
@@ -516,7 +520,7 @@ public class ItemGrid : MonoBehaviour
     {
         List<InventoryItem> uniqueItems = new List<InventoryItem>();
         if (inventoryItemSlot == null)
-        {
+                {
             Debug.LogWarning("[ItemGrid.GetAllUniqueItems] inventoryItemSlot is not initialized!");
             return uniqueItems; // Return empty list
         }
@@ -533,5 +537,23 @@ public class ItemGrid : MonoBehaviour
             }
         }
         return uniqueItems;
+    }
+
+    /// <summary>
+    /// Checks if the given grid position (Vector2Int) is valid within the grid boundaries.
+    /// </summary>
+    /// <param name="position">The grid position to check.</param>
+    /// <returns>True if the position is valid, false otherwise.</returns>
+    public bool IsValidGridPosition(Vector2Int position)
+    {
+        if (position.x < 0 || position.y < 0)
+        {
+            return false;
+        }
+        if (position.x >= gridSizeWidth || position.y >= gridSizeHeight)
+        {
+            return false;
+        }
+        return true;
     }
 }

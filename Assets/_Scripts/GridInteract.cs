@@ -14,7 +14,7 @@ public class GridInteract : MonoBehaviour, IPointerEnterHandler, IPointerExitHan
     /// <summary>
     /// 当前物品网格
     /// </summary>
-    private ItemGrid itemGrid;
+    public ItemGrid itemGrid;
 
     private void Awake()
     {

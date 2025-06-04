@@ -11,11 +11,8 @@ public class ShopController : MonoBehaviour
     [Tooltip("The ItemGrid component used for the shop display.")]
     public ItemGrid shopItemGrid; // 商店的ItemGrid
 
-    [Tooltip("Width of the shop in 3x3 grid units.")]
-    public int shopWidthInShopUnits = 2; // 商店宽度 (单位: 3x3格子)
-
-    [Tooltip("Height of the shop in 3x3 grid units.")]
-    public int shopHeightInShopUnits = 3; // 商店高度 (单位: 3x3格子)
+    [Tooltip("Maximum number of items to attempt to generate during a shop refresh.")]
+    public int maxItemsPerRefresh = 10; // New field for controlling item quantity
 
     [Header("Search Animation & Sound")]
     [Tooltip("Base search time for Rarity 0 items (seconds).")]
@@ -32,11 +29,11 @@ public class ShopController : MonoBehaviour
     [Tooltip("Optional button to trigger shop refresh.")]
     public Button refreshButton; // 刷新按钮 (可选)
 
-    private const int SHOP_UNIT_SIZE = 3; // 每个商店单元的大小 (3x3)
     private Queue<InventoryItem> itemsToSearchQueue = new Queue<InventoryItem>();
     private Coroutine currentSearchCoroutine;
     private AudioSource audioSource;
     private List<InventoryItem> currentShopItemsInternal = new List<InventoryItem>(); // Renamed to avoid confusion with any public property if ever added
+    private bool gamePhaseOver = false; // Flag to freeze shop operations
 
     void Start()
     {
@@ -71,19 +68,41 @@ public class ShopController : MonoBehaviour
             refreshButton.onClick.AddListener(RefreshShop);
         }
 
-        RefreshShop(); // 初始加载一次商店物品
+        // RefreshShop(); // MOVED: Initial call will be triggered by SceneCountdownTimer
     }
 
     void Update()
     {
+        if (gamePhaseOver) return; // Stop updates if game phase is over
+
         if (Input.GetKeyDown(KeyCode.D))
         {
             RefreshShop();
         }
     }
 
+    public void NotifyGamePhaseOver()
+    {
+        gamePhaseOver = true;
+        Debug.Log("[ShopController] Game phase is over. Shop operations are now frozen.");
+        if (currentSearchCoroutine != null)
+        {
+            StopCoroutine(currentSearchCoroutine);
+            currentSearchCoroutine = null;
+            Debug.Log("[ShopController] Stopped ongoing search coroutine due to game phase end.");
+        }
+        itemsToSearchQueue.Clear();
+        Debug.Log("[ShopController] Search queue cleared due to game phase end.");
+    }
+
     public void RefreshShop()
     {
+        if (gamePhaseOver) 
+        {
+            Debug.Log("[ShopController] RefreshShop called, but game phase is over. Aborting refresh.");
+            return;
+        }
+
         Debug.Log("[ShopController] RefreshShop Initiated.");
         if (shopItemGrid == null || 
             ItemDataLoader.Instance == null || 
@@ -109,15 +128,57 @@ public class ShopController : MonoBehaviour
         Debug.Log($"[ShopController] Found {playerItemsPendingSearch.Count} items in player inventories pending search.");
 
         // 2. Clear old items that were part of THIS shop's previous generation
-        Debug.Log($"[ShopController] Clearing {currentShopItemsInternal.Count} internally tracked shop items.");
-        foreach (InventoryItem oldShopItem in new List<InventoryItem>(currentShopItemsInternal)) // Iterate copy
+        Debug.Log($"[ShopController] Processing {currentShopItemsInternal.Count} internally tracked shop items for cleanup.");
+        List<InventoryItem> itemsToRemoveFromInternalTracking = new List<InventoryItem>();
+
+        foreach (InventoryItem oldShopItem in new List<InventoryItem>(currentShopItemsInternal)) // Iterate a copy for safe removal
         {
-            if (oldShopItem != null)
+            if (oldShopItem == null || oldShopItem.gameObject == null) // Already destroyed or null reference
             {
+                itemsToRemoveFromInternalTracking.Add(oldShopItem);
+                continue;
+            }
+
+            // If this item is now in the player's pending search, it means it was moved
+            // from the shop, and then the player initiated a search on it.
+            // The shop should not destroy it. NotifyItemPickedUpFromShop should have untracked it.
+            if (playerItemsPendingSearch.Contains(oldShopItem))
+            {
+                Debug.Log($"[ShopController] Item {oldShopItem.jsonData?.Name} is in player's pending search. Not destroying via shop refresh. Ensuring it's untracked by shop.");
+                itemsToRemoveFromInternalTracking.Add(oldShopItem);
+                continue;
+            }
+
+            // Check if the item is still physically parented to the shopItemGrid
+            if (oldShopItem.transform.parent == shopItemGrid.transform)
+            {
+                // Item is still on the shop grid, so clear its reference and destroy it.
+                Debug.Log($"[ShopController] Clearing and destroying old shop item still on shop grid: {oldShopItem.jsonData?.Name}");
                 if (shopItemGrid != null) shopItemGrid.ClearGridReference(oldShopItem);
                 Destroy(oldShopItem.gameObject);
-                // Debug.Log($"[ShopController] Destroyed internally tracked old shop item: {oldShopItem.jsonData?.Name}");
+                itemsToRemoveFromInternalTracking.Add(oldShopItem);
             }
+            else
+            {
+                // Item is in currentShopItemsInternal but NOT parented to shopItemGrid anymore.
+                // This means it was moved (e.g., to player inventory).
+                // It should have been untracked by NotifyItemPickedUpFromShop.
+                // This is a safeguard: do NOT destroy it. Just ensure it's removed from currentShopItemsInternal.
+                Debug.LogWarning($"[ShopController] Old shop item {oldShopItem.jsonData?.Name} was tracked by shop but is no longer on the shop grid (moved?). Untracking without destroying.");
+                itemsToRemoveFromInternalTracking.Add(oldShopItem);
+            }
+        }
+
+        // Remove all processed (destroyed or confirmed moved) items from the original tracking list.
+        foreach (var itemToRemove in itemsToRemoveFromInternalTracking)
+        {
+            currentShopItemsInternal.Remove(itemToRemove);
+        }
+        
+        // Ensure the list is completely clear for the new generation, as a final safeguard.
+        if (currentShopItemsInternal.Count > 0)
+        {
+            Debug.LogWarning($"[ShopController] {currentShopItemsInternal.Count} items unexpectedly remained in internal tracking after specific removal. Force clearing list. These items were not destroyed in this step.");
         }
         currentShopItemsInternal.Clear();
 
@@ -151,17 +212,28 @@ public class ShopController : MonoBehaviour
 
         // 5. Generate and enqueue new shop items
         List<InventoryItem> newlyGeneratedShopItems = new List<InventoryItem>();
-        for (int yShopUnit = 0; yShopUnit < shopHeightInShopUnits; yShopUnit++)
+        int itemsGenerated = 0;
+        int generationAttempts = 0; // To prevent infinite loops if shop is too small for items
+        int maxGenerationAttempts = maxItemsPerRefresh * 3; // Allow some failed attempts
+
+        while (itemsGenerated < maxItemsPerRefresh && generationAttempts < maxGenerationAttempts)
         {
-            for (int xShopUnit = 0; xShopUnit < shopWidthInShopUnits; xShopUnit++)
+            generationAttempts++;
+            InventoryItem generatedItem = TryGenerateAndPlaceRandomItemInShop();
+            if (generatedItem != null) 
             {
-                InventoryItem generatedItem = GenerateItemForShopUnit(xShopUnit * SHOP_UNIT_SIZE, yShopUnit * SHOP_UNIT_SIZE);
-                if (generatedItem != null) { newlyGeneratedShopItems.Add(generatedItem); }
+                newlyGeneratedShopItems.Add(generatedItem);
+                itemsGenerated++;
             }
+            // If shop is full or no suitable items can be placed, this loop will eventually terminate
+            // due to generationAttempts or itemsGenerated reaching their limits.
         }
+        Debug.Log($"[ShopController] Attempted to generate {maxItemsPerRefresh} items. Successfully generated and placed {itemsGenerated} items after {generationAttempts} attempts.");
         
-        newlyGeneratedShopItems = newlyGeneratedShopItems.OrderBy(item => item.onGridPositionY).ThenBy(item => item.onGridPositionX).ToList();
-        Debug.Log($"[ShopController] Generated and sorted {newlyGeneratedShopItems.Count} new items for the shop.");
+        // Sort by a consistent criteria if desired, e.g., Y then X position, or by rarity, or by name.
+        // For now, using the order they were successfully placed.
+        // newlyGeneratedShopItems = newlyGeneratedShopItems.OrderBy(item => item.onGridPositionY).ThenBy(item => item.onGridPositionX).ToList();
+        // Debug.Log($"[ShopController] Generated and sorted {newlyGeneratedShopItems.Count} new items for the shop.");
 
         foreach (var newShopItem in newlyGeneratedShopItems)
         {
@@ -176,7 +248,7 @@ public class ShopController : MonoBehaviour
         StartNextSearchInQueue();
     }
 
-    private InventoryItem GenerateItemForShopUnit(int unitStartX, int unitStartY)
+    private InventoryItem TryGenerateAndPlaceRandomItemInShop()
     {
         if (ItemDataLoader.Instance == null || ItemDataLoader.Instance.AllItems == null || ItemDataLoader.Instance.AllItems.Count == 0)
         {
@@ -184,28 +256,23 @@ public class ShopController : MonoBehaviour
             return null;
         }
 
-        List<JsonItemData> suitableAndValidItems = new List<JsonItemData>();
-        foreach (JsonItemData itemJsonData in ItemDataLoader.Instance.AllItems)
-        {
-            if (itemJsonData.itemType == 1 &&
-                itemJsonData.Level == 1 &&
-                itemJsonData.ParsedWidth <= SHOP_UNIT_SIZE &&
-                itemJsonData.ParsedHeight <= SHOP_UNIT_SIZE)
-            {
-                suitableAndValidItems.Add(itemJsonData);
-            }
-        }
+        // Filter for suitable items (e.g., type 1, level 1 - adjust as needed)
+        List<JsonItemData> suitableItems = ItemDataLoader.Instance.AllItems
+            .Where(itemData => itemData.itemType == 1 && itemData.Level == 1)
+            // Removed: itemJsonData.ParsedWidth <= SHOP_UNIT_SIZE && itemJsonData.ParsedHeight <= SHOP_UNIT_SIZE
+            .ToList();
 
-        if (suitableAndValidItems.Count == 0)
+        if (suitableItems.Count == 0)
         {
-            Debug.LogWarning("ShopController: No suitable items (type 1, level 1, <= 3x3) found.");
+            Debug.LogWarning("ShopController: No suitable items (type 1, level 1) found for shop generation.");
             return null;
         }
 
-        JsonItemData selectedJsonItemData = ItemDataLoader.Instance.SelectRandomItemByRarity(suitableAndValidItems);
+        JsonItemData selectedJsonItemData = ItemDataLoader.Instance.SelectRandomItemByRarity(suitableItems);
         if (selectedJsonItemData == null)
         {
-            Debug.LogError("ShopController: SelectRandomItemByRarity returned null.");
+            // This might happen if suitableItems list was empty AFTER rarity selection (if SelectRandomItemByRarity can return null)
+            Debug.LogError("ShopController: SelectRandomItemByRarity returned null from suitable items list.");
             return null;
         }
 
@@ -218,34 +285,41 @@ public class ShopController : MonoBehaviour
         InventoryItem newItem = itemGO.GetComponent<InventoryItem>();
         newItem.Set(selectedJsonItemData);
 
-        int targetX = unitStartX + (SHOP_UNIT_SIZE - newItem.WIDTH) / 2;
-        int targetY = unitStartY + (SHOP_UNIT_SIZE - newItem.HEIGHT); 
+        // Find a random available space in the shopItemGrid
+        Vector2Int? placementPos = shopItemGrid.FindSpaceForObject(newItem.WIDTH, newItem.HEIGHT);
 
-        if (!shopItemGrid.BoundryCheck(targetX, targetY, newItem.WIDTH, newItem.HEIGHT))
+        if (!placementPos.HasValue)
         {
-            Debug.LogWarning($"ShopController: Calculated position for {selectedJsonItemData.Name} at ({targetX},{targetY}) is out of bounds. Destroying.");
-            Destroy(itemGO);
+            // Debug.LogWarning($"ShopController: No space found for {selectedJsonItemData.Name} ({newItem.WIDTH}x{newItem.HEIGHT}). Destroying item.");
+            Destroy(itemGO); // Clean up unplaced item
             return null;
         }
 
-        List<InventoryItem> displacedItems = new List<InventoryItem>();
-        bool placed = shopItemGrid.PlaceItem(newItem, targetX, targetY, displacedItems);
+        // Boundary check should ideally be part of FindSpaceForObject or PlaceItem, 
+        // but if FindSpaceForObject guarantees validity, this is redundant.
+        // For safety, a check here or reliance on PlaceItem's own checks is fine.
+        // if (!shopItemGrid.BoundryCheck(placementPos.Value.x, placementPos.Value.y, newItem.WIDTH, newItem.HEIGHT))
+        // {
+        //     Debug.LogWarning($"ShopController: Calculated position for {selectedJsonItemData.Name} at ({placementPos.Value.x},{placementPos.Value.y}) is out of bounds. Destroying.");
+        //     Destroy(itemGO);
+        //     return null;
+        // }
+
+        List<InventoryItem> displacedItems = new List<InventoryItem>(); // Should be empty if FindSpaceForObject works well
+        bool placed = shopItemGrid.PlaceItem(newItem, placementPos.Value.x, placementPos.Value.y, displacedItems);
 
         if (!placed)
         {
-            Debug.LogWarning($"ShopController: Could not place {selectedJsonItemData.Name} at ({targetX},{targetY}). Destroying.");
+            Debug.LogWarning($"ShopController: Could not place {selectedJsonItemData.Name} at determined space ({placementPos.Value.x},{placementPos.Value.y}). Destroying item.");
             Destroy(itemGO);
             return null;
         }
         else
         {
-            // newItem.SetDisplayState(InventoryItem.ItemDisplayState.Hidden, true); // This is now done in RefreshShop
-            // DO NOT add to currentShopItems here, RefreshShop will do it after collecting all generated items.
-            // DO NOT add to itemsToSearchQueue here.
-            Debug.Log($"[ShopController] Generated item (for shop queue): {selectedJsonItemData.Name} (Rarity: {selectedJsonItemData.Rarity}) at ({targetX},{targetY}).");
-            if (displacedItems.Count > 0)
+            Debug.Log($"[ShopController] Generated and placed item for shop queue: {selectedJsonItemData.Name} (Rarity: {selectedJsonItemData.Rarity}) at ({placementPos.Value.x},{placementPos.Value.y}).");
+            if (displacedItems.Count > 0) // Should ideally be zero if FindSpaceForObject is accurate
             {
-                Debug.LogWarning($"ShopController: {displacedItems.Count} items displaced by {selectedJsonItemData.Name}. Destroying them.");
+                Debug.LogWarning($"ShopController: {displacedItems.Count} items unexpectedly displaced by {selectedJsonItemData.Name} after FindSpaceForObject. Destroying them.");
                 foreach (var dItem in displacedItems) { if (dItem != null) Destroy(dItem.gameObject); }
             }
             return newItem;
@@ -314,7 +388,7 @@ public class ShopController : MonoBehaviour
     public void AddItemToShopDirectly(InventoryItem item)
     {
         if (item == null || shopItemGrid == null) { if(item!=null) Destroy(item.gameObject); return; }
-        Vector2Int? pos = shopItemGrid.FindSpaceForObject(item);
+        Vector2Int? pos = shopItemGrid.FindSpaceForObject(item.WIDTH, item.HEIGHT);
         if (pos.HasValue)
         {
             List<InventoryItem> displaced = new List<InventoryItem>(); 
@@ -342,5 +416,14 @@ public class ShopController : MonoBehaviour
             Debug.Log($"[ShopController] Item {item.jsonData?.Name} picked from shop, untracked from internal list.");
         }
         // Note: If this item was in itemsToSearchQueue, SearchItemCoroutine's validity checks should handle it.
+    }
+
+    /// <summary>
+    /// Public method to be called by SceneCountdownTimer after its pre-countdown to initialize the shop.
+    /// </summary>
+    public void TriggerInitialShopSetup()
+    {
+        Debug.Log("[ShopController] TriggerInitialShopSetup called by SceneCountdownTimer.");
+        RefreshShop();
     }
 } 
