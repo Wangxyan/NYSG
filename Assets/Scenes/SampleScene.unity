@@ -1531,7 +1531,6 @@ MonoBehaviour:
   maxItemsPerRefresh: 4
   baseSearchTime: 1
   searchTimePerRarity: 0.5
-  searchCompleteSoundsByRarity: []
   inventoryController: {fileID: 519420033}
   refreshButton: {fileID: 1850692344}
 --- !u!82 &519420036
@@ -1646,7 +1645,6 @@ MonoBehaviour:
   maxItemsPerRefresh: 4
   baseSearchTime: 1
   searchTimePerRarity: 0.5
-  searchCompleteSoundsByRarity: []
   inventoryController: {fileID: 519420033}
   refreshButton: {fileID: 1850692344}
 --- !u!1 &578538871
@@ -1806,6 +1804,173 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: -20, y: -20}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!1 &594943900
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 594943901}
+  - component: {fileID: 594943905}
+  - component: {fileID: 594943904}
+  m_Layer: 0
+  m_Name: AudioManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &594943901
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 594943900}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 1030.2826, y: 574.4186, z: -4.4754186}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!82 &594943904
+AudioSource:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 594943900}
+  m_Enabled: 1
+  serializedVersion: 4
+  OutputAudioMixerGroup: {fileID: 0}
+  m_audioClip: {fileID: 0}
+  m_PlayOnAwake: 1
+  m_Volume: 1
+  m_Pitch: 1
+  Loop: 0
+  Mute: 0
+  Spatialize: 0
+  SpatializePostEffects: 0
+  Priority: 128
+  DopplerLevel: 1
+  MinDistance: 1
+  MaxDistance: 500
+  Pan2D: 0
+  rolloffMode: 0
+  BypassEffects: 0
+  BypassListenerEffects: 0
+  BypassReverbZones: 0
+  rolloffCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  panLevelCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  spreadCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  reverbZoneMixCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+--- !u!114 &594943905
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 594943900}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fdd9cd6e5554cdd43a2818da4c8bb3f4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  musicSource: {fileID: 594943904}
+  sfxSource: {fileID: 594943904}
+  countdownSfxSource: {fileID: 594943904}
+  backgroundMusic: {fileID: 0}
+  shopRefreshSound: {fileID: 8300000, guid: 4480970c82237414997d0517a4bcf91f, type: 3}
+  itemCraftedSound: {fileID: 8300000, guid: dd0aa9a34006a1e4cb9f45c1583939c3, type: 3}
+  itemToBagSound: {fileID: 8300000, guid: 07d514a6699c7144b938c18336fe9db5, type: 3}
+  bagFullSound: {fileID: 8300000, guid: 860e56666ab53db439f8bb658157c556, type: 3}
+  itemToShopSound: {fileID: 8300000, guid: d7b8c1d45c45ae84f991667a26abca56, type: 3}
+  genericItemSelectSound: {fileID: 8300000, guid: 2489256a92d32154c87ea95a415d05c8, type: 3}
+  genericItemPlaceSound: {fileID: 8300000, guid: 24ee49be89628c34c86328bf725c6dc3, type: 3}
+  gamePhaseEndSound: {fileID: 8300000, guid: 05c822072f54f5b4189887880885ee8d, type: 3}
+  itemDisplacedToShopSound: {fileID: 8300000, guid: 55186b3ddfd84d24799f484918f1e004, type: 3}
+  quickMoveToShopSound: {fileID: 0}
+  quickMoveToBagSound: {fileID: 0}
+  quickMoveToBagFailedSound: {fileID: 8300000, guid: c29f6958d555f7545af34d28cdef8e9d, type: 3}
+  resultsWindowPopupSound: {fileID: 8300000, guid: e1b1f948a7ef3ed459a7498c6a96ea7c, type: 3}
+  itemDetailsPopupSound: {fileID: 8300000, guid: 74c756ddb970de545869076ccf6c0324, type: 3}
+  preCountdownDisappearSound: {fileID: 8300000, guid: faab33c01a6ff5941ba764335974ca26, type: 3}
+  feedbackMessagePopupSound: {fileID: 8300000, guid: 474e6afbb300b6d498fc1c4512229795, type: 3}
+  preCountdownStartSound: {fileID: 8300000, guid: 3303b4812b830bd4c8ae62869c8cc3cc, type: 3}
+  lastTenSecondsTickSound: {fileID: 0}
+  finalCountdownBeep: {fileID: 8300000, guid: b9908941b8bd3b745b9953baf123bb23, type: 3}
+  searchCompleteSoundsByRarity:
+  - {fileID: 8300000, guid: fb5db25e594733d4999a046a43243934, type: 3}
+  - {fileID: 8300000, guid: 24554e4141e272f4183dbcd750055db7, type: 3}
 --- !u!1 &645960270
 GameObject:
   m_ObjectHideFlags: 0
@@ -2601,7 +2766,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d916b7b6bf73de743b5c23ca91cb3a82, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  countdownDurationSeconds: 20
+  countdownDurationSeconds: 60
   targetSceneName: LoadingScene
   countdownText: {fileID: 1280530408}
   preCountdownPanel: {fileID: 198915105}
@@ -4457,3 +4622,4 @@ SceneRoots:
   - {fileID: 1457867565}
   - {fileID: 1468915198}
   - {fileID: 1166123850}
+  - {fileID: 594943901}

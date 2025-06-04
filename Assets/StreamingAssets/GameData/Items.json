@@ -16,7 +16,9 @@
       "Rarity": 0,
       "SkillId": 101,
       "Points": [[1],[1]],
-      "options_num": 10
+      "options_num": 10,
+      "SelectAudioPath": "ItemAudios/1",
+      "PlaceAudioPath": "ItemAudios/2"
     },
     {
         "Id": 1002,

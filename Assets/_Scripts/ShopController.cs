@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Linq; // For OrderBy
 using UnityEngine.UI; // 添加对 UI 系统的引用
 
-[RequireComponent(typeof(AudioSource))] // Ensure AudioSource exists
+// Removed: [RequireComponent(typeof(AudioSource))] // AudioSource no longer managed here
 public class ShopController : MonoBehaviour
 {
     [Header("Shop Configuration")]
@@ -14,13 +14,12 @@ public class ShopController : MonoBehaviour
     [Tooltip("Maximum number of items to attempt to generate during a shop refresh.")]
     public int maxItemsPerRefresh = 10; // New field for controlling item quantity
 
-    [Header("Search Animation & Sound")]
+    [Header("Search Animation & Sound Settings (DEPRECATED - Handled by AudioManager)")]
     [Tooltip("Base search time for Rarity 0 items (seconds).")]
     [SerializeField] private float baseSearchTime = 1f;
     [Tooltip("Additional search time per rarity level (seconds).")]
     [SerializeField] private float searchTimePerRarity = 0.5f;
-    [Tooltip("Sound played when an item search is complete. Array index corresponds to Rarity. Ensure size matches max rarity.")]
-    [SerializeField] private AudioClip[] searchCompleteSoundsByRarity;
+    // Removed: [SerializeField] private AudioClip[] searchCompleteSoundsByRarity;
 
     [Header("References")]
     [Tooltip("Reference to the main InventoryController.")]
@@ -31,13 +30,13 @@ public class ShopController : MonoBehaviour
 
     private Queue<InventoryItem> itemsToSearchQueue = new Queue<InventoryItem>();
     private Coroutine currentSearchCoroutine;
-    private AudioSource audioSource;
+    // Removed: private AudioSource audioSource;
     private List<InventoryItem> currentShopItemsInternal = new List<InventoryItem>(); // Renamed to avoid confusion with any public property if ever added
     private bool gamePhaseOver = false; // Flag to freeze shop operations
 
     void Start()
     {
-        audioSource = GetComponent<AudioSource>();
+        // Removed: audioSource = GetComponent<AudioSource>();
 
         if (inventoryController == null)
         {
@@ -102,7 +101,7 @@ public class ShopController : MonoBehaviour
             Debug.Log("[ShopController] RefreshShop called, but game phase is over. Aborting refresh.");
             return;
         }
-
+        AudioManager.Instance?.PlayShopRefreshSound(); 
         Debug.Log("[ShopController] RefreshShop Initiated.");
         if (shopItemGrid == null || 
             ItemDataLoader.Instance == null || 
@@ -371,12 +370,7 @@ public class ShopController : MonoBehaviour
         Debug.Log($"[ShopController] Search complete for {item.jsonData.Name}. Revealing.");
         item.SetDisplayState(InventoryItem.ItemDisplayState.Revealed, true);
 
-        if (audioSource != null && searchCompleteSoundsByRarity != null)
-        {
-            int r = item.jsonData.Rarity;
-            if (r >= 0 && r < searchCompleteSoundsByRarity.Length && searchCompleteSoundsByRarity[r] != null) audioSource.PlayOneShot(searchCompleteSoundsByRarity[r]);
-            else if (r >= searchCompleteSoundsByRarity.Length && searchCompleteSoundsByRarity.Length > 0) audioSource.PlayOneShot(searchCompleteSoundsByRarity[searchCompleteSoundsByRarity.Length -1]);
-        }
+        AudioManager.Instance?.PlaySearchCompleteSound(item.jsonData.Rarity);
         StartNextSearchInQueue();
     }
     

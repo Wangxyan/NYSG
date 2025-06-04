@@ -76,7 +76,9 @@ public class SceneCountdownTimer : MonoBehaviour
 
     // References to other controllers
     private InventoryController inventoryControllerInstance;
-    private ShopController shopControllerInstance;
+    private ShopController[] shopControllersInstances; // Changed to array for multiple shops
+
+    private float lastRecordedTimeForBeep = float.MaxValue; // For per-second beep logic
 
     void Start()
     {
@@ -116,15 +118,15 @@ public class SceneCountdownTimer : MonoBehaviour
 
         // Find other controllers
         inventoryControllerInstance = FindObjectOfType<InventoryController>();
-        shopControllerInstance = FindObjectOfType<ShopController>();
+        shopControllersInstances = FindObjectsOfType<ShopController>(); // Find all shops
 
         if (inventoryControllerInstance == null)
         {
             Debug.LogWarning("SceneCountdownTimer: InventoryController not found in scene. Cannot notify it to freeze.");
         }
-        if (shopControllerInstance == null)
+        if (shopControllersInstances == null || shopControllersInstances.Length == 0)
         {
-            Debug.LogWarning("SceneCountdownTimer: ShopController not found in scene. Cannot notify it to freeze.");
+            Debug.LogWarning("SceneCountdownTimer: No ShopControllers found in scene. Cannot notify them to freeze.");
         }
 
         // Setup Early Exit Button
@@ -143,11 +145,13 @@ public class SceneCountdownTimer : MonoBehaviour
         countdownText.gameObject.SetActive(false); // Hide main timer initially
 
         gamePhaseEnded = false; // Ensure flag is reset on start
+        AudioManager.Instance?.ResetCountdownSoundsState(); // Reset any lingering countdown sounds
         StartCoroutine(PlayPreCountdownAnimationThenStartMainTimer());
     }
 
     private IEnumerator PlayPreCountdownAnimationThenStartMainTimer()
     {
+        AudioManager.Instance?.PlayPreCountdownStartSound();
         if (preCountdownPanel != null && preCountdownAnimText != null)
         {
             preCountdownPanel.SetActive(true);
@@ -163,6 +167,7 @@ public class SceneCountdownTimer : MonoBehaviour
             yield return new WaitForSeconds(preAnimPauseTime * 1.5f); // Hold "游戏开始!" a bit longer
 
             preCountdownPanel.SetActive(false);
+            AudioManager.Instance?.PlayPreCountdownDisappearSound(); // Play sound when panel disappears
         }
         else
         {
@@ -175,14 +180,13 @@ public class SceneCountdownTimer : MonoBehaviour
         InitializeAndStartMainTimer();
 
         // After pre-countdown and main timer init, trigger shop setup for ALL shop controllers
-        ShopController[] shopControllers = FindObjectsOfType<ShopController>();
-        if (shopControllers != null && shopControllers.Length > 0)
+        if (shopControllersInstances != null && shopControllersInstances.Length > 0)
         {
-            foreach (ShopController sc in shopControllers)
+            foreach (ShopController sc in shopControllersInstances)
             {
                 sc.TriggerInitialShopSetup();
             }
-            Debug.Log($"SceneCountdownTimer: Triggered initial shop setup for {shopControllers.Length} ShopController(s).");
+            Debug.Log($"SceneCountdownTimer: Triggered initial shop setup for {shopControllersInstances.Length} ShopController(s).");
         }
         else
         {
@@ -234,7 +238,26 @@ public class SceneCountdownTimer : MonoBehaviour
 
         if (currentTimeRemaining > 0)
         {
+            float previousTimeRemaining = currentTimeRemaining;
             currentTimeRemaining -= Time.deltaTime;
+
+            // Last 10 seconds logic
+            if (previousTimeRemaining > 10f && currentTimeRemaining <= 10f && currentTimeRemaining > 0) 
+            {
+                AudioManager.Instance?.StartLastTenSecondsTicks(); // Start looping tick-tock sound
+            }
+            
+            // Per-second beep for the last 10 seconds
+            if (currentTimeRemaining <= 10f && currentTimeRemaining > 0f) {
+                if (Mathf.FloorToInt(previousTimeRemaining) != Mathf.FloorToInt(currentTimeRemaining)) {
+                    AudioManager.Instance?.PlayFinalCountdownBeep();
+                }
+            }
+            else if (currentTimeRemaining <= 0f) // Timer just reached zero this frame
+            {
+                 AudioManager.Instance?.PlayFinalCountdownBeep(); // Play one last beep for 0
+            }
+
             UpdateTimerDisplay();
         }
         else
@@ -292,6 +315,7 @@ public class SceneCountdownTimer : MonoBehaviour
         Debug.Log("Showing results window.");
         countdownText.gameObject.SetActive(false); 
         resultsWindowPanel.SetActive(true);
+        AudioManager.Instance?.PlayResultsWindowPopupSound(); // Play sound when results window appears
 
         resultsTitleText.text = "时间到!"; 
         resultsAttributesText.gameObject.SetActive(false); 
@@ -400,6 +424,8 @@ public class SceneCountdownTimer : MonoBehaviour
         targetSceneName = sceneName;
         preCountdownFinished = false; // Reset pre-countdown flag
         timerIsRunning = false; // Ensure timer is stopped before pre-animation
+        gamePhaseEnded = false; // Reset game phase flag
+        AudioManager.Instance?.ResetCountdownSoundsState(); // Reset sounds
 
         // Re-hide/show UI for a fresh start
         if(preCountdownPanel != null) preCountdownPanel.SetActive(false);
@@ -431,19 +457,20 @@ public class SceneCountdownTimer : MonoBehaviour
         timerIsRunning = false; // Stop the timer explicitly if it was running
 
         Debug.Log("SceneCountdownTimer: Game phase ending. Notifying controllers and showing results.");
+        AudioManager.Instance?.StopLastTenSecondsTicks(); // Stop ticks sound
+        AudioManager.Instance?.PlayGamePhaseEndSound(); // Play game phase end sound
 
         // Notify other controllers to freeze their operations
         inventoryControllerInstance?.NotifyGamePhaseOver();
         // shopControllerInstance?.NotifyGamePhaseOver(); // Old way, notifying only one
 
-        ShopController[] allShopControllers = FindObjectsOfType<ShopController>();
-        if (allShopControllers != null && allShopControllers.Length > 0)
+        if (shopControllersInstances != null && shopControllersInstances.Length > 0)
         {
-            foreach (ShopController sc in allShopControllers)
+            foreach (ShopController sc in shopControllersInstances)
             {
                 sc.NotifyGamePhaseOver();
             }
-            Debug.Log($"SceneCountdownTimer: Notified {allShopControllers.Length} ShopController(s) of game phase over.");
+            Debug.Log($"SceneCountdownTimer: Notified {shopControllersInstances.Length} ShopController(s) of game phase over.");
         }
         else
         {

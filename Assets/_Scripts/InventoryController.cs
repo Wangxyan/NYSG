@@ -450,8 +450,9 @@ public class InventoryController : MonoBehaviour
         selectedItem = sourceGrid.PickUpItem(itemToPickUp.onGridPositionX, itemToPickUp.onGridPositionY);
         if (selectedItem != null)
         {
-            Debug.Log($"Picked up {selectedItem.jsonData.Name} from {sourceGrid.name} at {new Vector2Int(selectedItem.onGridPositionX, selectedItem.onGridPositionY)}");
-            rectTransform = selectedItem.GetComponent<RectTransform>(); // Assign rectTransform here
+            Debug.Log($"Picked up {selectedItem.jsonData.Name} from {sourceGrid.name} at {new Vector2Int(selectedItem.onGridPositionX, selectedItem.onGridPositionY)}.");
+            AudioManager.Instance?.PlayItemSelectSound(selectedItem.jsonData);
+            rectTransform = selectedItem.GetComponent<RectTransform>(); 
         rectTransform.SetParent(canvasTransform);
         rectTransform.SetAsLastSibling();
 
@@ -504,6 +505,7 @@ public class InventoryController : MonoBehaviour
             if (combinedSuccessfully)
             {
                 Debug.Log("[AttemptPlaceOrCombine] Combination successful.");
+                // AudioManager.Instance?.PlayItemPlaceSound(itemBeingPlaced.jsonData); // Sound played by TryCombineItems (as itemCraftedSound)
                 selectedItem = null; 
                 return; 
             }
@@ -514,12 +516,27 @@ public class InventoryController : MonoBehaviour
         }
         
         Debug.Log("[AttemptPlaceOrCombine] Proceeding with placement/displacement logic.");
-        List<InventoryItem> displacedItems = new List<InventoryItem>(); // Correctly use this for the displacement version of PlaceItem
+        List<InventoryItem> displacedItems = new List<InventoryItem>(); 
         bool placedSuccessfully = targetGrid.PlaceItem(itemBeingPlaced, targetTilePos.x, targetTilePos.y, displacedItems);
 
         if (placedSuccessfully)
         {
             Debug.Log($"[AttemptPlaceOrCombine] Successfully placed {itemBeingPlaced.jsonData.Name} into {targetGrid.name}. {displacedItems.Count} items were displaced.");
+            
+            // Play specific placement sound based on item data (if available), or generic place sound
+            AudioManager.Instance?.PlayItemPlaceSound(itemBeingPlaced.jsonData); 
+
+            if (playerInventoryGrids.Contains(targetGrid)) 
+            {
+                // This sound is for *generic* item to bag, specific quick move has its own sound
+                // AudioManager.Instance?.PlayItemToBagSound(); // Covered by PlayItemPlaceSound if bag is the target, or if more specific sound is needed for general bag placement
+            }
+            else if (targetGrid == shopItemGrid) 
+            {
+                // This sound is for *generic* item to shop, specific quick move / displacement have own sounds
+                // AudioManager.Instance?.PlayItemToShopSound(); // Covered by PlayItemPlaceSound if shop is target, or if more specific sound needed
+            }
+
             selectedItem = null; 
 
             if (displacedItems.Count > 0) 
@@ -527,9 +544,10 @@ public class InventoryController : MonoBehaviour
                 Debug.Log($"[AttemptPlaceOrCombine] {displacedItems.Count} items were displaced. Attempting to move them to shop.");
                 foreach (InventoryItem displacedItem in displacedItems)
                 {
-                    if (displacedItem == itemBeingPlaced) continue; // Should not happen if PlaceItem logic is correct
+                    if (displacedItem == itemBeingPlaced) continue; 
                     Debug.Log($"[AttemptPlaceOrCombine] Moving displaced item {displacedItem.jsonData.Name} from {targetGrid.name} to shop.");
-                    MoveItemToShop(displacedItem, shopItemGrid.FindSpaceForObject(displacedItem.jsonData.ParsedWidth, displacedItem.jsonData.ParsedHeight));
+                    bool movedToShop = MoveItemToShop(displacedItem, shopItemGrid.FindSpaceForObject(displacedItem.jsonData.ParsedWidth, displacedItem.jsonData.ParsedHeight), true);
+                    // Sound for displacement is now handled within MoveItemToShop if context is passed
                 }
             }
         }
@@ -539,62 +557,83 @@ public class InventoryController : MonoBehaviour
         }
     }
 
-    private void MoveItemToShop(InventoryItem itemToMove, Vector2Int? positionInShop)
+    private bool MoveItemToShop(InventoryItem itemToMove, Vector2Int? positionInShop, bool isDisplacement = false)
     {
-        if (itemToMove == null) return;
+        if (itemToMove == null) return false;
         if (shopItemGrid == null)
         {
             Debug.LogWarning($"Shop grid is not set for {itemToMove.jsonData.Name}. Cannot move item to shop. Destroying item.");
-            if (itemToMove == selectedItem) selectedItem = null; // Clear selection if it was selected
+            if (itemToMove == selectedItem) selectedItem = null; 
             Destroy(itemToMove.gameObject);
-            return;
+            return false;
         }
 
-        if (!positionInShop.HasValue) // If no specific position, try to find one
+        if (!positionInShop.HasValue) 
         {
             positionInShop = shopItemGrid.FindSpaceForObject(itemToMove.jsonData.ParsedWidth, itemToMove.jsonData.ParsedHeight);
         }
 
         if (positionInShop.HasValue)
         {
-            // Check for item already in the target slot before placing (should ideally be empty if FindSpaceForObject worked)
             InventoryItem itemAlreadyAtShopPos = shopItemGrid.GetItem(positionInShop.Value.x, positionInShop.Value.y);
-            if (itemAlreadyAtShopPos != null && itemAlreadyAtShopPos != itemToMove) {
-                 Debug.LogWarning($"Shop slot {positionInShop.Value} for displaced item {itemToMove.jsonData.Name} is already occupied by {itemAlreadyAtShopPos.jsonData.Name}. Destroying incoming item {itemToMove.jsonData.Name}.");
+            if (itemAlreadyAtShopPos != null && itemAlreadyAtShopPos != itemToMove) { // Should not happen if FindSpace is good
+                 Debug.LogWarning($"Shop slot {positionInShop.Value} for item {itemToMove.jsonData.Name} is already occupied by {itemAlreadyAtShopPos.jsonData.Name}. Destroying incoming item {itemToMove.jsonData.Name}.");
                  if (itemToMove == selectedItem) selectedItem = null;
                  Destroy(itemToMove.gameObject);
-                 return;
+                 return false;
             }
             
-            InventoryItem overlapItemInShop = null; 
-            bool placed = shopItemGrid.PlaceItem(itemToMove, positionInShop.Value.x, positionInShop.Value.y, ref overlapItemInShop); 
+            InventoryItem overlapItemInShop = null; // Using simpler PlaceItem overload
+            List<InventoryItem> displacedInShop = new List<InventoryItem>(); // PlaceItem expects this
+            bool placed = shopItemGrid.PlaceItem(itemToMove, positionInShop.Value.x, positionInShop.Value.y, displacedInShop); 
             
             if (placed)
             {
                 Debug.Log($"Moved item {itemToMove.jsonData.Name} to shop at {positionInShop.Value}.");
+                if (isDisplacement)
+                {
+                    AudioManager.Instance?.PlayItemDisplacedToShopSound();
+                }
+                else
+                {
+                    // This path is for direct moves to shop (not E key, that has its own sound)
+                    // Could be a generic "item placed in shop" sound or item-specific place sound
+                    AudioManager.Instance?.PlayItemPlaceSound(itemToMove.jsonData);
+                    // Or specifically AudioManager.Instance?.PlayItemToShopSound(); if PlayItemPlaceSound isn't generic enough for this context.
+                }
+                
                 if (selectedItem == itemToMove) 
                 {
                     selectedItem = null;
                 }
-                if (overlapItemInShop != null && overlapItemInShop != itemToMove) // Should not happen if FindSpace and GetItem check above are good
+                if (displacedInShop.Any(i => i != itemToMove)) 
                 {
-                     Debug.LogWarning($"Unexpected overlap in shop with {overlapItemInShop.jsonData.Name} when placing {itemToMove.jsonData.Name}. Destroying the overlapped item in shop.");
-                     shopItemGrid.ClearGridReference(overlapItemInShop); // Remove from grid logic
-                     Destroy(overlapItemInShop.gameObject);
+                     Debug.LogWarning($"Unexpected overlap in shop with items when placing {itemToMove.jsonData.Name}. Destroying the overlapped items in shop.");
+                     foreach(var dItem in displacedInShop)
+                     {
+                         if(dItem != itemToMove) 
+                         {
+                            shopItemGrid.ClearGridReference(dItem); 
+                            Destroy(dItem.gameObject);
+                         }
+                     }
                 }
+                return true;
             }
             else
             {
                 Debug.LogWarning($"Failed to place item {itemToMove.jsonData.Name} in shop at determined space {positionInShop.Value}. Destroying item.");
                 if (itemToMove == selectedItem) selectedItem = null;
                 Destroy(itemToMove.gameObject); 
+                return false;
             }
         }
-        else // No space found in shop
+        else 
         {
             Debug.LogWarning($"No space found in shop for {itemToMove.jsonData.Name}. Destroying item.");
             if (itemToMove == selectedItem) selectedItem = null;
             Destroy(itemToMove.gameObject);
+            return false;
         }
     }
     
@@ -618,6 +657,7 @@ public class InventoryController : MonoBehaviour
 
             if (nextLevelJsonData != null)
             {
+                AudioManager.Instance?.PlayItemCraftedSound(); // Play sound
                 Debug.Log($"[TryCombineItems] Found next level: {nextLevelJsonData.Name}. Combining on grid {currentGrid.name}");
                 
                 // It's important to use the correct positions from the items themselves
@@ -650,7 +690,7 @@ public class InventoryController : MonoBehaviour
                      {
                          if(dispItem == upgradedItem) continue;
                          Debug.LogWarning($"    Displaced by upgrade: {dispItem.jsonData.Name}. Moving to shop.");
-                         MoveItemToShop(dispItem, null); // Move to shop or handle as error
+                         MoveItemToShop(dispItem, null, true); // Move to shop or handle as error
                      }
                 }
                 return true; 
@@ -767,7 +807,6 @@ public class InventoryController : MonoBehaviour
             return;
         }
 
-        // Check the item's display state
         if (inventoryItem.currentDisplayState == InventoryItem.ItemDisplayState.Hidden || 
             inventoryItem.currentDisplayState == InventoryItem.ItemDisplayState.Searching)
         {
@@ -778,24 +817,22 @@ public class InventoryController : MonoBehaviour
                     currentUndiscoveredPopupInstance = Instantiate(undiscoveredItemPopupPrefab, canvasTransform);
                 }
                 currentUndiscoveredPopupInstance.SetActive(true);
-                // Optionally, position it near the mouse or item
-                // currentUndiscoveredPopupInstance.transform.position = Input.mousePosition;
+                AudioManager.Instance?.PlayItemDetailsPopupSound(); // Play sound for undiscovered/searching popup
                 Debug.Log($"Showing undiscovered/searching item popup for: {inventoryItem.jsonData?.Name}");
             }
             else
             {
                 Debug.LogWarning("UndiscoveredItemPopupPrefab not set. Cannot show special popup.");
-                // Fallback: Maybe show nothing, or show the standard one if that's preferred when special is missing
             }
         }
-        else // Revealed, Visible, etc.
+        else 
         {
             if (itemDetailsPopupPrefab == null)
             {
                 Debug.LogWarning("ItemDetailsPopupPrefab not set. Cannot show details.");
                 return;
             }
-            if (inventoryItem.jsonData == null) // jsonData might be null if item state is inconsistent
+            if (inventoryItem.jsonData == null) 
             {
                 Debug.LogError("Cannot show details for an item with no jsonData, even if not hidden.");
                 return;
@@ -807,7 +844,8 @@ public class InventoryController : MonoBehaviour
             }
             
             Sprite itemSprite = ItemDataLoader.Instance.GetSpriteByRes(inventoryItem.jsonData.Res);
-            currentDetailsPopupInstance.Show(inventoryItem.jsonData, itemSprite); // Assumes Show() also sets it active
+            currentDetailsPopupInstance.Show(inventoryItem.jsonData, itemSprite); 
+            AudioManager.Instance?.PlayItemDetailsPopupSound(); // Play sound for full details popup
             Debug.Log($"Showing full details for: {inventoryItem.jsonData.Name}");
         }
     }
@@ -927,12 +965,12 @@ public class InventoryController : MonoBehaviour
         InventoryItem itemToMove = null;
         ItemGrid sourceGridOfHoveredItem = null;
 
-        if (selectedItem != null) // Case 1: An item is currently selected (being dragged)
+        if (selectedItem != null) 
         {
             itemToMove = selectedItem;
             Debug.Log($"[Shortcut E] Moving selected item {itemToMove.jsonData.Name} to shop.");
         }
-        else // Case 2: No item selected, check if mouse is hovering over an item
+        else 
         {
             ItemGrid currentHoveredGrid;
             Vector2Int mousePosOnGrid = GetCurrentMouseGridPosition(out currentHoveredGrid);
@@ -941,16 +979,15 @@ public class InventoryController : MonoBehaviour
                 InventoryItem hoveredItem = currentHoveredGrid.GetItem(mousePosOnGrid.x, mousePosOnGrid.y);
                 if (hoveredItem != null)
                 {
-                    sourceGridOfHoveredItem = currentHoveredGrid; // Store the source grid
-                    itemToMove = sourceGridOfHoveredItem.PickUpItem(mousePosOnGrid.x, mousePosOnGrid.y); // Pick up the item
+                    sourceGridOfHoveredItem = currentHoveredGrid; 
+                    itemToMove = sourceGridOfHoveredItem.PickUpItem(mousePosOnGrid.x, mousePosOnGrid.y); 
                     if (itemToMove != null) {
                         Debug.Log($"[Shortcut E] Picked up hovered item {itemToMove.jsonData.Name} from {sourceGridOfHoveredItem.name} to move to shop.");
-                        // Ensure its parent is set correctly if MoveItemToShop expects it to be on canvasTransform
                         itemToMove.transform.SetParent(canvasTransform); 
                         itemToMove.transform.SetAsLastSibling();
                     } else {
                          Debug.LogError("[Shortcut E] Failed to pick up hovered item.");
-                         return; // Critical failure, stop further processing for this action
+                         return; 
                     }
                 }
             }
@@ -958,13 +995,12 @@ public class InventoryController : MonoBehaviour
 
         if (itemToMove != null)
         {
-            MoveItemToShop(itemToMove, null); // null for position, MoveItemToShop will find space
-            if (itemToMove == selectedItem) // If it was the selected item, clear selection
+            bool moved = MoveItemToShop(itemToMove, null, false); // isDisplacement is false for quick move
+            if (moved)
             {
-                selectedItem = null;
-                if(inventoryHighlight != null) inventoryHighlight.Show(false);
+                AudioManager.Instance?.PlayQuickMoveToShopSound();
             }
-            // If it was a hovered item, it's already been picked up and then moved (or destroyed by MoveItemToShop)
+            // selectedItem is handled by MoveItemToShop if it was the one moved
         }
         else
         {
@@ -983,15 +1019,15 @@ public class InventoryController : MonoBehaviour
 
         InventoryItem itemToMove = null;
         ItemGrid sourceGridOfHoveredItem = null; 
-        Vector2Int originalPosOfHoveredItem = Vector2Int.zero; // To store original pos if picked up
-        InventoryItem originalSelectedItemRef = selectedItem; // Keep a ref to see if we operated on the global selectedItem
+        Vector2Int originalPosOfHoveredItem = Vector2Int.zero; 
+        InventoryItem originalSelectedItemRef = selectedItem; 
 
-        if (selectedItem != null) // Case 1: An item is currently selected (being dragged)
+        if (selectedItem != null) 
         {
             itemToMove = selectedItem;
             Debug.Log($"[Shortcut W] Attempting to move selected item {itemToMove.jsonData.Name} to player inventory.");
         }
-        else // Case 2: No item selected, check if mouse is hovering over an item
+        else 
         {
             ItemGrid currentHoveredGrid;
             Vector2Int mousePosOnGrid = GetCurrentMouseGridPosition(out currentHoveredGrid);
@@ -1006,11 +1042,10 @@ public class InventoryController : MonoBehaviour
                         return;
                     }
                     sourceGridOfHoveredItem = currentHoveredGrid;
-                    originalPosOfHoveredItem = new Vector2Int(hoveredItem.onGridPositionX, hoveredItem.onGridPositionY); // Store pos before pickup
+                    originalPosOfHoveredItem = new Vector2Int(hoveredItem.onGridPositionX, hoveredItem.onGridPositionY); 
                     itemToMove = sourceGridOfHoveredItem.PickUpItem(mousePosOnGrid.x, mousePosOnGrid.y); 
                     if (itemToMove != null) {
                         Debug.Log($"[Shortcut W] Picked up hovered item {itemToMove.jsonData.Name} from {sourceGridOfHoveredItem.name} to move to player inventory.");
-                        // Parent to canvas temporarily like a selected item would be.
                         itemToMove.transform.SetParent(canvasTransform);
                         itemToMove.transform.SetAsLastSibling();
                     } else {
@@ -1034,6 +1069,7 @@ public class InventoryController : MonoBehaviour
                     if (playerGrid.PlaceItem(itemToMove, availablePosition.Value.x, availablePosition.Value.y, displacedItems))
                     {
                         Debug.Log($"[Shortcut W] Successfully placed {itemToMove.jsonData.Name} into player grid {playerGrid.name}.");
+                        AudioManager.Instance?.PlayQuickMoveToBagSound(); // New sound for quick move success
                         placedInPlayerInventory = true;
                         if (itemToMove == originalSelectedItemRef) 
                         {
@@ -1044,7 +1080,7 @@ public class InventoryController : MonoBehaviour
                             Debug.LogWarning($"[Shortcut W] {displacedItems.Count} items displaced in player inventory by quick move of {itemToMove.jsonData.Name}. Moving them to shop.");
                             foreach(var displaced in displacedItems) {
                                 if (displaced == itemToMove) continue;
-                                MoveItemToShop(displaced, null);
+                                MoveItemToShop(displaced, null, true); // Pass true for isDisplacement
                             }
                         }
                         break; 
@@ -1055,7 +1091,8 @@ public class InventoryController : MonoBehaviour
             if (!placedInPlayerInventory)
             {
                 Debug.Log($"[Shortcut W] No space found in player inventories for {itemToMove.jsonData.Name}.");
-                ShowTemporaryMessage("背包没有足够的空间"); // Display message here
+                ShowTemporaryMessage("背包没有足够的空间"); 
+                AudioManager.Instance?.PlayQuickMoveToBagFailedSound(); // New sound for quick move fail (no space)
 
                 if (sourceGridOfHoveredItem != null && itemToMove != originalSelectedItemRef) 
                 {
@@ -1066,7 +1103,9 @@ public class InventoryController : MonoBehaviour
                         Debug.LogWarning($"[Shortcut W] Could not return {itemToMove.jsonData.Name} to its original spot. Destroying it.");
                         Destroy(itemToMove.gameObject);
                     }
+                    // No specific sound for returning to original spot after fail, or could add one.
                 }
+                // If it was the selectedItem, it remains selected, no specific sound for that failure case beyond the message & bag full sound.
             }
         }
         else
@@ -1079,7 +1118,6 @@ public class InventoryController : MonoBehaviour
     {
         if (feedbackMessageText == null) return;
 
-        // Stop any previous animations or hide coroutines
         if (activeAppearAnimationCoroutine != null)
         {
             StopCoroutine(activeAppearAnimationCoroutine);
@@ -1093,15 +1131,12 @@ public class InventoryController : MonoBehaviour
 
         feedbackMessageText.text = message;
         feedbackMessageText.gameObject.SetActive(true);
+        AudioManager.Instance?.PlayFeedbackMessagePopupSound(); // Play sound when feedback message appears
         
-        // Reset color to fully opaque before showing (in case it was faded out)
         Color originalColor = feedbackMessageText.color;
         feedbackMessageText.color = new Color(originalColor.r, originalColor.g, originalColor.b, 1f);
 
-        // Start Appear Animation (Scale)
         activeAppearAnimationCoroutine = StartCoroutine(AnimateMessageAppearCoroutine());
-
-        // Start Hide Timer
         activeFeedbackMessageCoroutine = StartCoroutine(HideMessageAfterDelayCoroutine());
     }
 

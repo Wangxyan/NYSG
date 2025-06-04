@@ -22,6 +22,10 @@ public class JsonItemData
     public int options_num;
     public int Rarity;         // New field for item rarity, 0 = most common
 
+    // New fields for item-specific audio paths
+    public string SelectAudioPath; // e.g., "ItemAudios/item_select_sound_name"
+    public string PlaceAudioPath;  // e.g., "ItemAudios/item_place_sound_name"
+
     private int parsedWidth = -1;
     private int parsedHeight = -1;
 
