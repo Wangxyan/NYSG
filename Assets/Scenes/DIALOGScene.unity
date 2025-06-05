@@ -1173,7 +1173,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &501322165
 RectTransform:
   m_ObjectHideFlags: 0
@@ -2046,7 +2046,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &709041571
 RectTransform:
   m_ObjectHideFlags: 0
@@ -2844,8 +2844,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d916b7b6bf73de743b5c23ca91cb3a82, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  countdownDurationSeconds: 5
-  targetSceneName: DIALOGScene
+  countdownDurationSeconds: 60
+  targetSceneName: LoadingScene
   countdownText: {fileID: 1280530408}
   preCountdownPanel: {fileID: 198915105}
   preCountdownAnimText: {fileID: 1507724332}

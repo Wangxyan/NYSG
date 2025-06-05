@@ -14,12 +14,11 @@ public class ShopController : MonoBehaviour
     [Tooltip("Maximum number of items to attempt to generate during a shop refresh.")]
     public int maxItemsPerRefresh = 10; // New field for controlling item quantity
 
-    [Header("Search Animation & Sound Settings (DEPRECATED - Handled by AudioManager)")]
-    [Tooltip("Base search time for Rarity 0 items (seconds).")]
-    [SerializeField] private float baseSearchTime = 1f;
-    [Tooltip("Additional search time per rarity level (seconds).")]
-    [SerializeField] private float searchTimePerRarity = 0.5f;
-    // Removed: [SerializeField] private AudioClip[] searchCompleteSoundsByRarity;
+    [Header("Search Time Configuration")]
+    [Tooltip("List of search times in seconds, indexed by rarity. E.g., index 0 is for Rarity 0, index 1 for Rarity 1, etc.")]
+    [SerializeField] private List<float> searchTimesByRarity = new List<float> { 1.0f, 1.5f, 2.0f, 2.5f, 3.0f, 4.0f, 5.0f }; // Default values for rarities 0-6
+    [Tooltip("Default search time if an item's rarity is outside the defined list (seconds).")]
+    [SerializeField] private float defaultSearchTimeForUndefinedRarity = 1.0f;
 
     [Header("References")]
     [Tooltip("Reference to the main InventoryController.")]
@@ -357,8 +356,23 @@ public class ShopController : MonoBehaviour
         
         item.SetDisplayState(InventoryItem.ItemDisplayState.Searching, true); // Ensure it's in searching state
 
-        float searchDuration = baseSearchTime + (item.jsonData.Rarity * searchTimePerRarity);
-        yield return new WaitForSeconds(Mathf.Max(0.1f, searchDuration));
+        float searchDuration;
+        int rarity = item.jsonData.Rarity;
+
+        if (rarity >= 0 && rarity < searchTimesByRarity.Count)
+        {
+            searchDuration = searchTimesByRarity[rarity];
+        }
+        else
+        {
+            Debug.LogWarning($"[ShopController] Rarity {rarity} for item '{item.jsonData.Name}' is outside the defined searchTimesByRarity list (count: {searchTimesByRarity.Count}). Using default search time: {defaultSearchTimeForUndefinedRarity}s.");
+            searchDuration = defaultSearchTimeForUndefinedRarity;
+        }
+        
+        // Ensure search duration is not excessively small
+        searchDuration = Mathf.Max(0.1f, searchDuration);
+
+        yield return new WaitForSeconds(searchDuration);
         
         if (item == null || item.gameObject == null || !item.gameObject.activeInHierarchy) // Re-check after wait
         {

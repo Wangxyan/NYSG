@@ -6,6 +6,10 @@ using System.Collections.Generic; // Required for List
 /// </summary>
 public class ItemGrid : MonoBehaviour
 {
+    [Header("Grid Configuration")]
+    [Tooltip("A unique identifier for this grid, used for saving and loading items.")]
+    public string gridId = "defaultPlayerGrid"; // Assign a unique ID in the Inspector, e.g., "mainBag", "hotbar"
+
     /// <summary>
     /// 瓦片的宽度
     /// </summary>

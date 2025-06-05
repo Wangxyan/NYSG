@@ -456,13 +456,12 @@ public class SceneCountdownTimer : MonoBehaviour
         gamePhaseEnded = true;
         timerIsRunning = false; // Stop the timer explicitly if it was running
 
-        Debug.Log("SceneCountdownTimer: Game phase ending. Notifying controllers and showing results.");
+        Debug.Log("SceneCountdownTimer: Game phase ending. Notifying controllers, saving data, and showing results.");
         AudioManager.Instance?.StopLastTenSecondsTicks(); // Stop ticks sound
         AudioManager.Instance?.PlayGamePhaseEndSound(); // Play game phase end sound
 
         // Notify other controllers to freeze their operations
         inventoryControllerInstance?.NotifyGamePhaseOver();
-        // shopControllerInstance?.NotifyGamePhaseOver(); // Old way, notifying only one
 
         if (shopControllersInstances != null && shopControllersInstances.Length > 0)
         {
@@ -477,12 +476,36 @@ public class SceneCountdownTimer : MonoBehaviour
             Debug.LogWarning("SceneCountdownTimer: No ShopControllers found to notify of game phase over.");
         }
 
+        // --- SAVE DATA LOGIC --- //
+        Debug.Log("SceneCountdownTimer: Attempting to save game data before showing results.");
+        if (inventoryControllerInstance != null)
+        {
+            inventoryControllerInstance.SaveInventoryState(); // Saves items, which implicitly saves attributes via GameDataManager
+            Debug.Log("SceneCountdownTimer: Inventory state saved.");
+        }
+        else
+        {
+            Debug.LogWarning("SceneCountdownTimer: inventoryControllerInstance is null. Cannot save inventory state.");
+        }
+
+        // Ensure GameDataManager is marked correctly (SaveInventoryState already does MarkDataAsPersisted)
+        if (GameDataManager.Instance != null)
+        {
+            GameDataManager.Instance.PrepareForNewSceneLoad(); // Optional: For logging or pre-processing
+            Debug.Log("SceneCountdownTimer: GameDataManager prepared for new scene load.");
+        }
+        else
+        {
+            Debug.LogWarning("SceneCountdownTimer: GameDataManager.Instance is null. Cannot prepare for new scene load.");
+        }
+        // --- END SAVE DATA LOGIC --- //
+
         // Hide early exit button if it exists, as game is now over
         if (earlyExitButton != null)
         {
             earlyExitButton.gameObject.SetActive(false);
         }
 
-        ShowResultsWindow();
+        ShowResultsWindow(); // This will then show results based on the just-saved/current state
     }
 } 

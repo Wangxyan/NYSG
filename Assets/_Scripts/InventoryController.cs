@@ -115,6 +115,14 @@ public class InventoryController : MonoBehaviour
     public float dragStartDistanceThreshold = 10f;
     // --- End new fields ---
 
+    [Header("Effects")] // 新增一个Header用于特效相关的字段
+    [Tooltip("Assign the GameObject prefab to play on successful item combination.")]
+    [SerializeField] private GameObject combineEffectPrefab; // 用于合成特效的预制体 (通用GameObject)
+    [Tooltip("Duration for the combine effect to last before being destroyed.")]
+    [SerializeField] private float combineEffectDuration = 2f; // 特效持续时间
+    [Tooltip("Assign a UI Panel (RectTransform or Transform) that will host the instantiated effects. Ensure this panel is ordered correctly in your UI hierarchy to appear above grids.")]
+    [SerializeField] private Transform effectsHostPanel; // 用于承载特效的Panel
+
     [Header("Feedback UI")]
     [Tooltip("Text UI element to display messages like 'insufficient space'. Assign in Inspector.")]
     public Text feedbackMessageText; // Or TextMeshProUGUI
@@ -132,6 +140,8 @@ public class InventoryController : MonoBehaviour
     private bool gamePhaseOver = false; // Flag to freeze interactions
     private Coroutine activeFeedbackMessageCoroutine = null;
     private Coroutine activeAppearAnimationCoroutine = null; // For managing scale animation
+
+    private bool hasLoadedInventory = false; // 防止重复加载
 
     private void Awake()
     {
@@ -158,6 +168,20 @@ public class InventoryController : MonoBehaviour
         {
             Debug.LogWarning("InventoryController: FeedbackMessageText UI is not assigned. UI feedback messages will not be shown.");
         }
+
+        // 确保特效承载Panel的引用存在
+        if (effectsHostPanel == null)
+        {
+            Debug.LogWarning("InventoryController: effectsHostPanel is not assigned. Effects might not be parented correctly or appear as intended. Consider assigning a dedicated UI panel for effects.");
+            // 如果未分配，可以默认使用canvasTransform，但用户明确要求用panel承载
+            // effectsHostPanel = canvasTransform; 
+        }
+        else
+        {
+            // 可选：尝试将特效面板置于其父级（canvasTransform）的最顶层，但这取决于层级结构
+            // effectsHostPanel.SetAsLastSibling(); 
+            // 更推荐用户在编辑器中手动调整好 effectsHostPanel 的层级顺序
+        }
     }
 
     void Start() // 或者 Awake，确保 ItemDataLoader 和其他依赖项已准备好
@@ -180,6 +204,12 @@ public class InventoryController : MonoBehaviour
         if (undiscoveredItemPopupPrefab == null)
         {
             Debug.LogWarning("InventoryController: UndiscoveredItemPopupPrefab is not assigned. Hidden item popup functionality will be limited.");
+        }
+
+        // Attempt to load inventory state if data exists from a previous scene
+        if (GameDataManager.Instance != null && GameDataManager.Instance.HasPersistedData && !hasLoadedInventory)
+        {
+            LoadInventoryState();
         }
     }
 
@@ -660,8 +690,10 @@ public class InventoryController : MonoBehaviour
                 AudioManager.Instance?.PlayItemCraftedSound(); // Play sound
                 Debug.Log($"[TryCombineItems] Found next level: {nextLevelJsonData.Name}. Combining on grid {currentGrid.name}");
                 
-                // It's important to use the correct positions from the items themselves
                 Vector2Int existingItemOriginalPos = new Vector2Int(existingItem.onGridPositionX, existingItem.onGridPositionY);
+
+                // 在销毁旧物品之前，获取特效播放的位置
+                Vector3 effectPosition = existingItem.transform.position;
 
                 Debug.Log($"[TryCombineItems] Removing existingItem: {existingItem.jsonData.Name} from grid {currentGrid.name} at its pos {existingItemOriginalPos}");
                 currentGrid.ClearGridReference(existingItem); 
@@ -673,26 +705,41 @@ public class InventoryController : MonoBehaviour
                 InventoryItem upgradedItem = Instantiate(itemPrefab).GetComponent<InventoryItem>();
                 upgradedItem.Set(nextLevelJsonData);
                 
-                // The combination happens at the position of the 'existingItem'
                 List<InventoryItem> displacedByUpgraded = new List<InventoryItem>();
-                Debug.Log($"[TryCombineItems] Placing upgraded item {upgradedItem.jsonData.Name} at {combinePos} on grid {currentGrid.name}"); // combinePos should be existingItem's pos
+                Debug.Log($"[TryCombineItems] Placing upgraded item {upgradedItem.jsonData.Name} at {combinePos} on grid {currentGrid.name}");
                 
                 bool placementOfUpgraded = currentGrid.PlaceItem(upgradedItem, combinePos.x, combinePos.y, displacedByUpgraded);
                 
                 if (!placementOfUpgraded) {
                     Debug.LogError($"[TryCombineItems] CRITICAL: Failed to place upgraded item {nextLevelJsonData.Name}. Upgraded item lost!");
-                    Destroy(upgradedItem.gameObject); // Clean up instantiated but unplaced item
+                    Destroy(upgradedItem.gameObject); 
                     return false; 
                 }
-                if (displacedByUpgraded.Any(i => i != upgradedItem)) { // Check if anything *other than* the item itself was "displaced"
+                if (displacedByUpgraded.Any(i => i != upgradedItem)) { 
                      Debug.LogWarning($"[TryCombineItems] Upgraded item unexpectedly displaced other items. This should ideally not happen if space was cleared. Handling displaced items.");
                      foreach(var dispItem in displacedByUpgraded)
                      {
                          if(dispItem == upgradedItem) continue;
                          Debug.LogWarning($"    Displaced by upgrade: {dispItem.jsonData.Name}. Moving to shop.");
-                         MoveItemToShop(dispItem, null, true); // Move to shop or handle as error
+                         MoveItemToShop(dispItem, null, true); 
                      }
                 }
+
+                // 播放合成特效
+                if (combineEffectPrefab != null)
+                {
+                    Transform parentForEffect = (effectsHostPanel != null) ? effectsHostPanel : canvasTransform; // 如果指定了Panel则用Panel，否则用Canvas
+                    GameObject effectInstance = Instantiate(combineEffectPrefab, effectPosition, Quaternion.identity, parentForEffect);
+                    effectInstance.SetActive(true); // 确保实例化的特效是激活状态
+                    effectInstance.transform.SetAsLastSibling(); // 将特效设置为其新父级（effectsHostPanel或canvasTransform）的最后一个子对象
+                    Destroy(effectInstance, combineEffectDuration); 
+                    Debug.Log($"[TryCombineItems] Playing combine effect (GameObject) at {effectPosition} under '{parentForEffect.name}' for {combineEffectDuration} seconds, set to render on top within its parent.");
+                }
+                else
+                {
+                    Debug.LogWarning("[TryCombineItems] combineEffectPrefab (GameObject) is not assigned in InventoryController. No effect played.");
+                }
+
                 return true; 
             }
             else {
@@ -1165,10 +1212,8 @@ public class InventoryController : MonoBehaviour
 
     private IEnumerator HideMessageAfterDelayCoroutine()
     {
-        // Wait for the main duration (excluding disappear animation time)
         yield return new WaitForSeconds(feedbackMessageDuration);
         
-        // Start Disappear Animation (Fade)
         if (feedbackMessageText == null || !feedbackMessageText.gameObject.activeSelf) 
         {
             activeFeedbackMessageCoroutine = null;
@@ -1195,5 +1240,182 @@ public class InventoryController : MonoBehaviour
         }
         activeFeedbackMessageCoroutine = null;
     }
-    // --- End Public Methods ---
+
+    // --- Save and Load Logic ---
+    public void SaveInventoryState()
+    {
+        if (GameDataManager.Instance == null)
+        {
+            Debug.LogError("[InventoryController.SaveInventoryState] GameDataManager.Instance is null. Cannot save inventory.");
+            return;
+        }
+
+        GameDataManager.Instance.persistedPlayerItems.Clear(); // Clear previous save data
+
+        if (playerInventoryGrids == null || playerInventoryGrids.Count == 0)
+        {
+            Debug.LogWarning("[InventoryController.SaveInventoryState] No playerInventoryGrids assigned. Nothing to save.");
+            GameDataManager.Instance.MarkDataAsPersisted(); // Still mark as persisted so attributes might save
+            return;
+        }
+
+        Debug.Log($"[InventoryController.SaveInventoryState] Saving inventory items from {playerInventoryGrids.Count} grids.");
+        foreach (ItemGrid grid in playerInventoryGrids)
+        {
+            if (grid == null)
+            {
+                Debug.LogWarning("[InventoryController.SaveInventoryState] Encountered a null ItemGrid in playerInventoryGrids. Skipping.");
+                continue;
+            }
+
+            List<InventoryItem> itemsInGrid = grid.GetAllUniqueItems();
+            Debug.Log($"[InventoryController.SaveInventoryState] Grid '{grid.gridId}' has {itemsInGrid.Count} unique items to save.");
+            foreach (InventoryItem item in itemsInGrid)
+            {
+                if (item != null && item.jsonData != null)
+                {
+                    PersistedItemInfo persistedInfo = new PersistedItemInfo(
+                        grid.gridId,
+                        item.jsonData.Id,
+                        item.onGridPositionX,
+                        item.onGridPositionY,
+                        item.rotated,
+                        item.currentDisplayState
+                    );
+                    GameDataManager.Instance.persistedPlayerItems.Add(persistedInfo);
+                    Debug.Log($"    Saved: {item.jsonData.Name} (ID: {item.jsonData.Id}) from grid '{grid.gridId}' at ({item.onGridPositionX},{item.onGridPositionY}), Rotated: {item.rotated}, State: {item.currentDisplayState}");
+                }
+            }
+        }
+        GameDataManager.Instance.MarkDataAsPersisted();
+        Debug.Log($"[InventoryController.SaveInventoryState] Inventory save complete. Total items persisted: {GameDataManager.Instance.persistedPlayerItems.Count}");
+    }
+
+    public void LoadInventoryState()
+    {
+        if (hasLoadedInventory) 
+        {
+            Debug.LogWarning("[InventoryController.LoadInventoryState] Inventory already loaded. Aborting to prevent duplicates.");
+            return;
+        }
+
+        if (GameDataManager.Instance == null || !GameDataManager.Instance.HasPersistedData)
+        {
+            Debug.LogWarning("[InventoryController.LoadInventoryState] GameDataManager.Instance is null or no persisted data found. Cannot load inventory.");
+            return;
+        }
+
+        if (ItemDataLoader.Instance == null)
+        {
+            Debug.LogError("[InventoryController.LoadInventoryState] ItemDataLoader.Instance is null. Cannot load item details.");
+            return;
+        }
+
+        if (playerInventoryGrids == null || playerInventoryGrids.Count == 0)
+        {
+            Debug.LogWarning("[InventoryController.LoadInventoryState] No playerInventoryGrids assigned. Cannot place loaded items.");
+            return;
+        }
+        
+        // Optional: Clear any items that might be in the grids by default in the new scene before loading
+        // This depends on your scene setup. If grids are meant to be empty, this is a good idea.
+        ClearAllPlayerInventoryGrids();
+        Debug.Log($"[InventoryController.LoadInventoryState] Cleared existing items from player grids before loading.");
+
+        Debug.Log($"[InventoryController.LoadInventoryState] Loading {GameDataManager.Instance.persistedPlayerItems.Count} items.");
+
+        foreach (PersistedItemInfo persistedInfo in GameDataManager.Instance.persistedPlayerItems)
+        {
+            ItemGrid targetGrid = playerInventoryGrids.FirstOrDefault(g => g != null && g.gridId == persistedInfo.gridId);
+            if (targetGrid == null)
+            {
+                Debug.LogWarning($"[InventoryController.LoadInventoryState] Could not find ItemGrid with ID '{persistedInfo.gridId}' for item ID {persistedInfo.itemId}. Item cannot be loaded.");
+                continue;
+            }
+
+            JsonItemData itemJsonData = ItemDataLoader.Instance.AllItems.FirstOrDefault(itemData => itemData.Id == persistedInfo.itemId);
+            if (itemJsonData == null)
+            {
+                Debug.LogWarning($"[InventoryController.LoadInventoryState] Could not find JsonItemData for item ID {persistedInfo.itemId}. Item cannot be loaded.");
+                continue;
+            }
+
+            if (itemPrefab == null)
+            {
+                Debug.LogError("[InventoryController.LoadInventoryState] itemPrefab is not assigned! Cannot instantiate items.");
+                return; // Critical error
+            }
+
+            InventoryItem newItem = Instantiate(itemPrefab).GetComponent<InventoryItem>();
+            if (canvasTransform == null) 
+            {
+                 Debug.LogError("[InventoryController.LoadInventoryState] canvasTransform is null! Items will not be parented correctly.");
+                 // Attempt to find it again, though ideally it should be set in Awake/Start of InventoryController
+                 Canvas parentCanvas = GetComponentInParent<Canvas>();
+                 if (parentCanvas != null) canvasTransform = parentCanvas.transform;
+                 if (canvasTransform == null) { Destroy(newItem.gameObject); continue; }
+            }
+            newItem.transform.SetParent(canvasTransform); // Parent to canvas first for Set() to work correctly if it uses GetComponentInParent<Canvas>
+            
+            newItem.Set(itemJsonData);
+            newItem.rotated = persistedInfo.isRotated; // Apply rotation before placing if it affects size
+            // newItem.SetDisplayState(persistedInfo.displayState, true); // Set might default to Revealed, override if needed
+
+            // Ensure the item's RectTransform is updated after rotation for correct placement dimensions
+            if(newItem.rotated) newItem.Rotate(); // Call rotate to flip dimensions if it was saved rotated but Set() doesn't handle initial rotated state size.
+            if(!newItem.rotated) { // If not rotated, ensure its size is set correctly by Set() without a redundant Rotate() call
+                Vector2 size = new Vector2(newItem.jsonData.ParsedWidth * ItemGrid.tileSizeWidth, newItem.jsonData.ParsedHeight * ItemGrid.tileSizeHeight); 
+                newItem.GetComponent<RectTransform>().sizeDelta = size;
+            }
+
+            List<InventoryItem> tempListForDisplaced = new List<InventoryItem>(); // Temporary list for the PlaceItem call
+            bool placed = targetGrid.PlaceItem(newItem, persistedInfo.positionX, persistedInfo.positionY, tempListForDisplaced);
+            
+            if (tempListForDisplaced.Count > 0)
+            {
+                Debug.LogWarning($"[InventoryController.LoadInventoryState] When loading {newItem.jsonData.Name}, {tempListForDisplaced.Count} items were unexpectedly displaced. This shouldn't happen if grids were cleared properly. Destroying displaced items.");
+                foreach(var displacedItem in tempListForDisplaced)
+                {
+                    if(displacedItem != null && displacedItem.gameObject != null) Destroy(displacedItem.gameObject);
+                }
+            }
+
+            if (placed)
+            {
+                // Set display state AFTER placement, as some logic might depend on item being on grid
+                newItem.SetDisplayState(persistedInfo.displayState, true);
+                Debug.Log($"    Loaded and placed: {itemJsonData.Name} (ID: {itemJsonData.Id}) onto grid '{targetGrid.gridId}' at ({persistedInfo.positionX},{persistedInfo.positionY}), Rotated: {persistedInfo.isRotated}, State: {persistedInfo.displayState}");
+            }
+            else
+            {
+                Debug.LogWarning($"[InventoryController.LoadInventoryState] Failed to place item {itemJsonData.Name} (ID: {itemJsonData.Id}) onto grid '{targetGrid.gridId}' at ({persistedInfo.positionX},{persistedInfo.positionY}). Item might be lost or already an item there.");
+                Destroy(newItem.gameObject); // Clean up unplaced item
+            }
+        }
+        hasLoadedInventory = true;
+        Debug.Log("[InventoryController.LoadInventoryState] Inventory load complete.");
+    }
+
+    // Helper method to clear all items from player inventory grids
+    public void ClearAllPlayerInventoryGrids()
+    {
+        if (playerInventoryGrids == null) return;
+        foreach(ItemGrid grid in playerInventoryGrids)
+        {
+            if (grid != null)
+            {
+                List<InventoryItem> itemsToClear = grid.GetAllUniqueItems();
+                foreach(InventoryItem item in itemsToClear)
+                {
+                    if (item != null)
+                    {
+                        grid.ClearGridReference(item); // Important to remove from grid's internal slot array
+                        Destroy(item.gameObject);
+                    }
+                }
+            }
+        }
+        Debug.Log("[InventoryController] All player inventory grids cleared.");
+    }
+    // --- End Save and Load Logic ---
 }
